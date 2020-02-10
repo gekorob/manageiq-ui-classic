@@ -20,6 +20,11 @@ module Mixins
           if @reconfigitems.size == 1
             vm = @reconfigitems.first
             @vlan_options = get_vlan_options(vm.host_id)
+
+            if vm.kind_of?(ManageIQ::Providers::Redhat::InfraManager::Vm)
+              @vlan_options.concat(get_external_vlan_options(vm))
+            end
+
             @avail_adapter_names = vm.try(:available_adapter_names) || []
             @iso_options = get_iso_options(vm)
           end
@@ -224,6 +229,21 @@ module Mixins
             vlan_options << lan.name
           end
           vlan_options.sort
+        end
+
+        def get_external_vlan_options(vm)
+          ext_vlan_options = []
+          ext_switch_ids = []
+          ems = vm.ext_management_system
+
+          Rbac.filtered(ems.external_distributed_virtual_switches).each do |ext_switch|
+            ext_switch_ids << ext_switch.id
+          end
+
+          Rbac.filtered(ems.external_distributed_virtual_lans.where(:switch_id => ext_switch_ids)).each do |ext_lan|
+            ext_vlan_options << "#{ext_lan.name}/#{ext_lan.switch.name}"
+          end
+          ext_vlan_options.sort
         end
 
         def get_iso_options(vm)
